@@ -1,0 +1,372 @@
+** Data Wrangling ** --------------------------------------------------------------------------------------------------
+-- Create a database
+create database if not exists walmart_sales;
+
+-- create a table
+create table if not exists WalmartSalesDatacsv(
+	invoice_id VARCHAR(30) NOT NULL PRIMARY KEY,
+    branch VARCHAR(5) NOT NULL,
+    city VARCHAR(30) NOT NULL,
+    customer_type VARCHAR(30) NOT NULL,
+    gender VARCHAR(10) NOT NULL,
+    product_line VARCHAR(100) NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    quantity INT NOT NULL,
+    VAT FLOAT(6,4) NOT NULL,
+    total DECIMAL(10,2) NOT NULL,
+    date DATE NOT NULL,
+    time TIMESTAMP NOT NULL,
+    payment_method DECIMAL(10,2) NOT NULL,
+    cogs DECIMAL(10,2) NOT NULL,
+    gross_margin_percentage FLOAT(11,9),
+    gross_income DECIMAL(10,2) NOT NULL,
+    rating FLOAT(2,1) 
+);
+
+** Feature Engineering ** --------------------------------------------------------------------------------------------------
+-- Add a new column named time_of_day to give insight of sales in the Morning, Afternoon and Evening. 
+--This will help answer the question on which part of the day most sales are made.
+
+select 
+	time,
+    ( 
+      		case 
+    			when time BETWEEN "00:00:00" and "12:00:00" then 'Morning'
+    			when time BETWEEN "12:00:01" and "16:00:00" then 'Afternoon'
+    			else 'Evening'
+    		end 
+    ) as time_of_day
+from WalmartSalesDatacsv
+alter table WalmartSalesDatacsv add column time_of_day varchar(20);
+update WalmartSalesDatacsv
+set time_of_day = (
+  	case 
+    			when time BETWEEN "00:00:00" and "12:00:00" then 'Morning'
+    			when time BETWEEN "12:00:01" and "16:00:00" then 'Afternoon'
+    			else 'Evening'
+    end 
+);
+
+-- Add a new column named day_name that contains the extracted days of the week on which the given transaction took place (Mon, Tue, Wed, Thur, Fri). 
+--This will help answer the question on which week of the day each branch is busiest.
+
+select
+	date,
+    (
+      case cast (strftime('%w', date) as integer)
+  	when 0 then 'Sunday'
+  	when 1 then 'Monday'
+  	when 2 then 'Tuesday'
+  	when 3 then 'Wednesday'
+  	when 4 then 'Thursday'
+  	when 5 then 'Friday'
+  	else 'Saturday'
+      end) as day_name
+from WalmartSalesDatacsv
+alter table WalmartSalesDatacsv add column day_name varchar(20);
+update WalmartSalesDatacsv
+set day_name = (
+	case cast (strftime('%w', date) as integer)
+  		when 0 then 'Sunday'
+  		when 1 then 'Monday'
+  		when 2 then 'Tuesday'
+  		when 3 then 'Wednesday'
+  		when 4 then 'Thursday'
+  		when 5 then 'Friday'
+  		else 'Saturday'
+    end
+);
+
+-- Add a new column named month_name that contains the extracted months of the year on which the given transaction took place (Jan, Feb, Mar). 
+-- Help determine which month of the year has the most sales and profit.
+
+select 
+	date,
+    (
+      case cast (strftime('%m', date) as integer)
+  	when 1 then 'Jan'
+  	when 2 then 'Feb'
+  	when 3 then 'Mar'
+  	when 4 then 'Apr'
+  	when 5 then 'May'
+    when 6 then 'Jun'
+    when 7 then 'Jul'
+    when 8 then 'Aug'
+    when 9 then 'Sep'
+    when 10 then 'Oct'
+    when 11 then 'Nov'
+  	else 'Dec'
+      end) as month_name
+from WalmartSalesDatacsv
+alter table WalmartSalesDatacsv add column month_name varchar(10);
+update WalmartSalesDatacsv
+set month_name = (
+case cast (strftime('%m', date) as integer)
+  	when 1 then 'Jan'
+  	when 2 then 'Feb'
+  	when 3 then 'Mar'
+  	when 4 then 'Apr'
+  	when 5 then 'May'
+    when 6 then 'Jun'
+    when 7 then 'Jul'
+    when 8 then 'Aug'
+    when 9 then 'Sep'
+    when 10 then 'Oct'
+    when 11 then 'Nov'
+  	else 'Dec'
+      end
+);
+
+** Exploratory Data Analysis ** --------------------------------------------------------------------------------------------------
+--  Generic Questions --
+
+-- How many unique cities does the data have? 
+select DISTINCT city
+from WalmartSalesDatacsv
+-- Yangon, Naypyitaw, Mandalay 
+
+-- In which city is each branch? 
+select branch, city
+from WalmartSalesDatacsv
+group by city
+-- Yangon (A), Naypyitaw (C), Mandalay (B) 
+
+** Product Questions ** --------------------------------------------------------------------------------------------------
+-- How many unique product lines does the data have? 
+select distinct product_line
+from WalmartSalesDatacsv
+-- 6: Health and Beauty, Electronic accessories, Home and Lifestyle, Sports and Travel, Food and Beverages, Fashion accessories;
+
+--What is the most common payment method?
+SELECT
+	payment,
+	count(payment) as count_payment
+from WalmartSalesDatacsv
+group by payment
+-- Ewallet, then cash, and credit card at the bottom;
+
+--What is the most selling product line?
+SELECT
+	product_line,
+    count(product_line)
+from WalmartSalesDatacsv
+group by product_line
+order by product_line DESC
+-- fashion accessories;
+
+-- What is the total revenue by month?
+select 
+	month_name,
+    sum(total)
+from WalmartSalesDatacsv
+group by month_name
+order by total DESC;
+-- January;
+
+-- What month had the largest COGS?
+SELECT
+	month_name,
+    sum(cogs)
+from WalmartSalesDatacsv
+group by month_name
+order by cogs DESC;
+--January;
+
+--What product line had the largest revenue?
+SELECT
+	product_line,
+    sum(total)
+from WalmartSalesDatacsv
+group by product_line
+order by total DESC;
+-- Food and beverages;
+
+-- What is the city with the largest revenue?
+SELECT
+	city,
+    sum(total)
+from WalmartSalesDatacsv
+group by city
+order by total DEsc;
+-- Naypyitaw;
+
+--  What product line had the largest VAT?
+SELECT
+	product_line,
+    avg(vat) as avg_vat
+from WalmartSalesDatacsv
+group by product_line
+order by avg_vat DESC;
+--Home and lifestyle;
+
+-- Fetch each product line and add a column to those product line showing "Good", "Bad". Good if its greater than average sales
+SELECT
+	product_line,
+    avg(total),
+    avg(total) over(),
+   	(
+    case 
+      when avg(total) > avg(total) over() then 'Good'
+      else 'Bad'
+    END
+    ) as performance
+from WalmartSalesDatacsv
+group by product_line
+
+
+--Which branch sold more products than average product sold?
+SELECT
+	branch,
+    sum(quantity) as qty
+from WalmartSalesDatacsv
+group by branch
+having sum(quantity) > (select avg(quantity) from WalmartSalesDatacsv)
+-- A;                     
+
+-- What is the most common product line by gender?
+SELECT
+	product_line,
+   	count(gender) as cnt_gen
+from WalmartSalesDatacsv
+where gender = 'Female'
+group by product_line
+order by cnt_gen DESC
+-- Female --> Fashion accessories
+SELECT
+	product_line,
+   	count(gender) as cnt_gen
+from WalmartSalesDatacsv
+where gender = 'Male'
+group by product_line
+order by cnt_gen DESC
+-- Male --> Health and Beauty;
+
+--What is the average rating of each product line?
+SELECT
+	product_line,
+    avg(rating)
+from WalmartSalesDatacsv
+group by product_line
+-- electronic=6.9, fashion=7.0, Food= 7.11, Health= 7.0, Home= 6.8, Sports= 6.9;
+
+** Sales Questions ** --------------------------------------------------------------------------------------------------
+-- Number of sales made in each time of the day per weekday
+SELECT
+	time_of_day,
+    count(total) as total_sales
+    
+from WalmartSalesDatacsv
+where day_name = 'Friday'
+group by time_of_day
+
+--Which of the customer types brings the most revenue?
+SELECT
+	customer_type,
+    sum(total)
+from WalmartSalesDatacsv
+group by customer_type
+-- Member;
+
+-- Which city has the largest tax percent/ VAT (Value Added Tax)?
+SELECT
+	city,
+    avg(vat)
+from WalmartSalesDatacsv
+group by city
+-- Naypyitaw;
+
+--Which customer type pays the most in VAT?
+select 
+	customer_type,
+    avg(vat)
+from WalmartSalesDatacsv
+group by customer_type
+-- Memeber;
+
+** Customer Questions ** --------------------------------------------------------------------------------------------------
+--How many unique customer types does the data have?
+SELECT
+	distinct customer_type
+from WalmartSalesDatacsv
+-- member and normal;
+
+--How many unique payment methods does the data have?
+SELECT
+	DISTINCT payment
+from WalmartSalesDatacsv
+-- Ewallet, Cash, Credit card;
+
+--What is the most common customer type?
+SELECT
+	customer_type,
+    count(customer_type)
+from WalmartSalesDatacsv
+group by customer_type
+--member;
+
+--Which customer type buys the most?
+SELECT
+	customer_type,
+    sum(total)
+from WalmartSalesDatacsv
+group by customer_type
+-- member;
+
+--What is the gender of most of the customers?
+SELECT
+	gender,
+    count(*)
+from WalmartSalesDatacsv
+group by gender
+--female;
+
+--What is the gender distribution per branch?
+SELECT
+	branch,
+    gender,
+    count(gender)
+from WalmartSalesDatacsv
+where branch = 'C'
+group by gender
+-- in branch A and B the majority of customers are men; in branch C the majority are women;
+
+--Which time of the day do customers give most ratings?
+SELECT
+	time_of_day,
+    avg(rating)
+from WalmartSalesDatacsv
+group by time_of_day
+-- Afternoon;
+
+--Which time of the day do customers give most ratings per branch?
+SELECT
+	branch,
+    time_of_day,
+    avg(rating) as avg_rating
+from WalmartSalesDatacsv
+where branch = 'A'
+group by time_of_day
+order by avg_rating DESC
+--A -> Afternoon, B -> Morning, C-> Evening;
+
+--Which day of the week has the best avg ratings?
+SELECT
+	day_name,
+    avg(rating) as avg_rating
+from WalmartSalesDatacsv
+group by day_name
+order by avg_rating DESC
+-- Monday;
+
+--Which day of the week has the best average ratings per branch?
+SELECT
+	day_name,
+    avg(rating) as avg_rating
+from WalmartSalesDatacsv
+Where branch = 'C'
+group by day_name
+order by avg_rating DESC
+-- branch A --> Friday, branch B --> Monday, branch C --> Friday;
+
+
+
